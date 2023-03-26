@@ -1,5 +1,6 @@
 import json
 from pyproj import Proj, transform
+import pandas as pd
 
 source_filename = 'data/Counties_and_Unitary_Authorities_December_2022_UK_BFC_-4504570890330359041.geojson'
 target_filename = 'data/Counties_and_Unitary_Authorities_transformed.geojson'
@@ -14,20 +15,30 @@ v36 = Proj(proj="latlong", k=0.9996012717, ellps="airy",
 vgrid = Proj(init="world:bng")
 
 
-def ENtoLL84(easting, northing):
+def ENtoLL84(row):
     """Returns (longitude, latitude) tuple
     """
+    easting, northing = row['x1'], row['y1']
     vlon36, vlat36 = vgrid(easting, northing, inverse=True)
-    return transform(v36, v84, vlon36, vlat36)
+    return list(transform(v36, v84, vlon36, vlat36))
 
 def convert_polygon(polygon):
-    for i in range(0, len(polygon)):
-        coord1 = polygon[i]
-        x1, y1 = coord1[0], coord1[1]
-        x2, y2 = ENtoLL84(x1,y1)
-        coord2 = [x2, y2]
-        polygon[i] = coord2
-    return polygon
+    
+    df = pd.DataFrame(polygon, columns = ['x1', 'y1'])
+
+    df['x2'], df['y2'] = df.apply(lambda row: ENtoLL84(row), axis=1)
+
+    output = df.values.tolist()
+    print(output)
+    return output
+
+    # for i in range(0, len(polygon)):
+    #     coord1 = polygon[i]
+    #     x1, y1 = coord1[0], coord1[1]
+    #     x2, y2 = ENtoLL84(x1,y1)
+    #     coord2 = [x2, y2]
+    #     polygon[i] = coord2
+    # return polygon
 
 j = 1
 for county in counties['features']:
