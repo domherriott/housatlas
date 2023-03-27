@@ -1,6 +1,7 @@
 import json
 from pyproj import Proj, transform
 import pandas as pd
+import numpy as np
 
 source_filename = 'data/Counties_and_Unitary_Authorities_December_2022_UK_BFC_-4504570890330359041.geojson'
 target_filename = 'data/Counties_and_Unitary_Authorities_transformed.geojson'
@@ -15,30 +16,25 @@ v36 = Proj(proj="latlong", k=0.9996012717, ellps="airy",
 vgrid = Proj(init="world:bng")
 
 
-def ENtoLL84(row):
+def ENtoLL84_vec(easting, northing):
     """Returns (longitude, latitude) tuple
     """
-    easting, northing = row['x1'], row['y1']
     vlon36, vlat36 = vgrid(easting, northing, inverse=True)
-    return list(transform(v36, v84, vlon36, vlat36))
+    (lon, lat) = transform(v36, v84, vlon36, vlat36)
+    return lon, lat
 
 def convert_polygon(polygon):
     
     df = pd.DataFrame(polygon, columns = ['x1', 'y1'])
 
-    df['x2'], df['y2'] = df.apply(lambda row: ENtoLL84(row), axis=1)
+    lon, lat = ENtoLL84_vec(df['x1'], df['y1'])
+    df['x2'] = lon.tolist()
+    df['y2'] = lat.tolist()
 
+    df = df[['x2','y2']].round(4)
     output = df.values.tolist()
-    print(output)
     return output
 
-    # for i in range(0, len(polygon)):
-    #     coord1 = polygon[i]
-    #     x1, y1 = coord1[0], coord1[1]
-    #     x2, y2 = ENtoLL84(x1,y1)
-    #     coord2 = [x2, y2]
-    #     polygon[i] = coord2
-    # return polygon
 
 j = 1
 for county in counties['features']:
@@ -46,16 +42,15 @@ for county in counties['features']:
     j += 1
 
     print(county['properties']['CTYUA22CD'])
-    type = county['geometry']['type']
+    poly_type = county['geometry']['type']
 
-    if type =='Polygon':
+    if poly_type =='Polygon':
         county['geometry']['coordinates'][0] = convert_polygon(county['geometry']['coordinates'][0])
-    elif type == 'MultiPolygon':
+    elif poly_type == 'MultiPolygon':
         for i in range(0, len(county['geometry']['coordinates'])):
             county['geometry']['coordinates'][i][0] = convert_polygon(county['geometry']['coordinates'][i][0])
 
-    # if j == 10:
-    #     break
+
 
 with open(target_filename, 'w') as f:
     json.dump(counties, f)
